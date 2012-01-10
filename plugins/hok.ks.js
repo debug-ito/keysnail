@@ -3,12 +3,13 @@
 const PLUGIN_INFO =
 <KeySnailPlugin>
     <name>HoK</name>
-    <description>Hit a hint for KeySnail</description>
-    <description lang="ja">キーボードでリンクを開く</description>
-    <version>1.3.1</version>
-    <updateURL>https://github.com/mooz/keysnail/raw/master/plugins/hok.ks.js</updateURL>
+    <description>Hit a hint for KeySnail (Modified for Numpaar)</description>
+    <description lang="ja">キーボードでリンクを開く (Numpaar向け改造版)</description>
+    <version>1.3.1-numpaar</version>
+    <updateURL></updateURL>
     <iconURL>https://github.com/mooz/keysnail/raw/master/plugins/icon/hok.icon.png</iconURL>
     <author mail="stillpedant@gmail.com" homepage="http://d.hatena.ne.jp/mooz/">mooz</author>
+    <author mail="debug.ito@gmail.com" homepage="http://debugitos.main.jp/">Toshio ITO</author>
     <license>MPL</license>
     <minVersion>1.8.0</minVersion>
     <include>main</include>
