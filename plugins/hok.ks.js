@@ -1185,7 +1185,7 @@ var hok = function () {
 
             drawHints();
 
-            if (hintCount > 1)
+            if (hintCount >= 1)
             {
                 document.addEventListener('keypress', onKeyPress, true);
                 document.addEventListener('keydown', preventEvent, true);
@@ -1193,35 +1193,8 @@ var hok = function () {
             }
             else
             {
-                // remove hints, recover keysnail's keyhandler, ...
-                destruction(true);
-
-                if (hintCount == 1)
-                {
-                    // only one hint found, immediatly fire
-                    try
-                    {
-                        // TODO: Is there a good way to do this?
-                        for (let [, hintElem] in Iterator(hintElements))
-                        {
-                            if (supressUniqueFire)
-                                hintElem.element.focus();
-                            else
-                                fire(hintElem.element);
-
-                            break;
-                        }
-                    }
-                    catch (x)
-                    {
-                        util.message(x);
-                    }
-                }
-                else
-                {
-                    display.echoStatusBar(M({ja: "ヒントが見つかりませんでした", en: "No hints found"}), 1000);
-                    recoverFocus();
-                }
+                display.echoStatusBar(M({ja: "ヒントが見つかりませんでした", en: "No hints found"}), 1000);
+                recoverFocus();
             }
         },
 
