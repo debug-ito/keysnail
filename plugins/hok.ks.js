@@ -298,6 +298,15 @@ const pOptions = plugins.setupOptions("hok", {
         type: "string"
     },
 
+    'numpaar_keys' : {
+        preset: '456',
+        description: M({
+            en: 'Alternate hints keys for Numpaar (default 456)',
+            ja: 'Numpaar動作時にヒントに使うキー(デフォルトは 456)'
+        }),
+        type: "string"
+    },
+
     "unique_fire" : {
         preset: true,
         description: M({
@@ -1172,6 +1181,11 @@ var hok = function () {
 
             supressUniqueFire = aContext.supressUniqueFire;
             continuousMode  = aContext.continuous;
+            if(aContext.alternateHintKeys) {
+                hintKeys = aContext.alternateHintKeys;
+            }else {
+                hintKeys = pOptions['hint_keys'];
+            }
 
             currentAction = aAction;
             priorQuery    = aContext.query;
@@ -1198,18 +1212,24 @@ var hok = function () {
             }
         },
 
-        startForeground: function (supressUniqueFire) {
-            self.start(function (elem) followLink(elem, CURRENT_TAB),
-                      {
-                          supressUniqueFire: supressUniqueFire
-                      });
+        startForeground: function (arg) {
+            var context;
+            if(arg) {
+                context = {supressUniqueFire: true, alternateHintKeys: pOptions['numpaar_keys']};
+            }else {
+                context = {supressUniqueFire: false};
+            }
+            self.start(function (elem) followLink(elem, CURRENT_TAB), context);
         },
 
-        startBackground: function (supressUniqueFire) {
-            hok.start(function (elem) followLink(elem, NEW_BACKGROUND_TAB),
-                      {
-                          supressUniqueFire: supressUniqueFire
-                      });
+        startBackground: function (arg) {
+            var context;
+            if(arg) {
+                context = {supressUniqueFire: true, alternateHintKeys: pOptions['numpaar_keys']};
+            }else {
+                context = {supressUniqueFire: false};
+            }
+            hok.start(function (elem) followLink(elem, NEW_BACKGROUND_TAB), context);
         },
 
         startContinuous: function () {
