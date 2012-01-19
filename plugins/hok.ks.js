@@ -1212,8 +1212,10 @@ var hok = function () {
             var context;
             if(arg) {
                 context = {supressUniqueFire: true, alternateHintKeys: pOptions['numpaar_keys']};
+                uniqueOnly = false;
             }else {
                 context = {supressUniqueFire: false};
+                uniqueOnly = pOptions["unique_only"];
             }
             self.start(function (elem) followLink(elem, CURRENT_TAB), context);
         },
@@ -1222,8 +1224,10 @@ var hok = function () {
             var context;
             if(arg) {
                 context = {supressUniqueFire: true, alternateHintKeys: pOptions['numpaar_keys']};
+                uniqueOnly = false;
             }else {
                 context = {supressUniqueFire: false};
+                uniqueOnly = pOptions["unique_only"];
             }
             hok.start(function (elem) followLink(elem, NEW_BACKGROUND_TAB), context);
         },
