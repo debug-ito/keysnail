@@ -1242,6 +1242,13 @@ var hok = function () {
                           supressUniqueFire: false,
                           continuous: true
                       });
+        },
+
+        startFocusFrame: function (arg) {
+            var result = createCommonContext(arg);
+            uniqueOnly = result.unique_only;
+            result.context.query = query.frames;
+            hok.start(function (elem) elem.ownerDocument.defaultView.focus());
         }
     };
 
