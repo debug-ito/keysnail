@@ -1174,6 +1174,18 @@ var hok = function () {
             });
     }
 
+    function createCommonContext (is_numpaar_mode){
+        var result = {"context" : null, "unique_only" : null};
+        if(is_numpaar_mode) {
+            result.context = {supressUniqueFire: true, alternateHintKeys: pOptions['numpaar_keys']};
+            result.unique_only = false;
+        }else {
+            result.context = {supressUniqueFire: false};
+            result.unique_only = pOptions["unique_only"];
+        }
+        return result;
+    }
+
     var self = {
         start: function (aAction, aContext) {
             if (!window.content)
@@ -1213,27 +1225,15 @@ var hok = function () {
         },
 
         startForeground: function (arg) {
-            var context;
-            if(arg) {
-                context = {supressUniqueFire: true, alternateHintKeys: pOptions['numpaar_keys']};
-                uniqueOnly = false;
-            }else {
-                context = {supressUniqueFire: false};
-                uniqueOnly = pOptions["unique_only"];
-            }
-            self.start(function (elem) followLink(elem, CURRENT_TAB), context);
+            var result = createCommonContext(arg);
+            uniqueOnly = result.unique_only;
+            self.start(function (elem) followLink(elem, CURRENT_TAB), result.context);
         },
 
         startBackground: function (arg) {
-            var context;
-            if(arg) {
-                context = {supressUniqueFire: true, alternateHintKeys: pOptions['numpaar_keys']};
-                uniqueOnly = false;
-            }else {
-                context = {supressUniqueFire: false};
-                uniqueOnly = pOptions["unique_only"];
-            }
-            hok.start(function (elem) followLink(elem, NEW_BACKGROUND_TAB), context);
+            var result = createCommonContext(arg);
+            uniqueOnly = result.unique_only;
+            hok.start(function (elem) followLink(elem, NEW_BACKGROUND_TAB), result.context);
         },
 
         startContinuous: function () {
