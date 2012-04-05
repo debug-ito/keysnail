@@ -6,7 +6,7 @@ const PLUGIN_INFO =
     <description>Hit a hint for KeySnail (Modified for Numpaar)</description>
     <description lang="ja">キーボードでリンクを開く (Numpaar向け改造版)</description>
     <version>1.3.1-numpaar</version>
-    <updateURL></updateURL>
+    <updateURL>https://raw.github.com/debug-ito/keysnail/master/plugins/hok.ks.js</updateURL>
     <iconURL>https://github.com/mooz/keysnail/raw/master/plugins/icon/hok.icon.png</iconURL>
     <author mail="stillpedant@gmail.com" homepage="http://d.hatena.ne.jp/mooz/">mooz</author>
     <author mail="debug.ito@gmail.com" homepage="http://debugitos.main.jp/">Toshio ITO</author>
