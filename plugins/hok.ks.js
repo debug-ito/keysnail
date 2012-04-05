@@ -36,6 +36,11 @@ key.setViewKey(';', function (aEvent, aArg) {
 key.setViewKey(['C-c', 'C-e'], function (aEvent, aArg) {
     ext.exec("hok-start-continuous-mode", aArg);
 }, 'Start continuous HaH', true);
+
+key.setViewKey(['C-c', 'C-f'], function (aEvent, aArg) {
+    ext.exec("hok-start-focus-frame-mode", aArg);
+}, 'HoK - focus on a frame', true);
+
 ||<
 
 In this example, you can start hah by pressing e key in the view mode.
@@ -104,6 +109,10 @@ key.setViewKey(';', function (aEvent, aArg) {
 key.setViewKey(['C-c', 'C-e'], function (aEvent, aArg) {
     ext.exec("hok-start-continuous-mode", aArg);
 }, 'リンクを連続して開く Hit a Hint を開始', true);
+
+key.setViewKey(['C-c', 'C-f'], function (aEvent, aArg) {
+    ext.exec("hok-start-focus-frame-mode", aArg);
+}, 'HoK - フレームへフォーカスする', true);
 ||<
 
 上記のような設定を .keysnail.js へ記述しておくことにより、ブラウズ画面において e キーを押すことで通常モードの Hit a Hint を開始させることが可能となります。
@@ -1248,7 +1257,7 @@ var hok = function () {
             var result = createCommonContext(arg);
             uniqueOnly = result.unique_only;
             result.context.query = query.frames;
-            hok.start(function (elem) elem.ownerDocument.defaultView.focus());
+            hok.start(function (elem) elem.ownerDocument.defaultView.focus(), result.context);
         }
     };
 
@@ -1354,6 +1363,11 @@ plugins.withProvides(function (provide) {
             }
         });
     }, M({ja: "HoK - 拡張ヒントモードを開始", en: "Start Hit a Hint extended mode"}));
+    
+    provide("hok-start-focus-frame-mode",
+            function (ev, arg) hok.startFocusFrame(!(arg == null)),
+            M({ja: "HoK - フレームへフォーカス", en: "Start Hit a Hint to focus on a frame"}));
+    
 }, PLUGIN_INFO);
 
 // }} ======================================================================= //
