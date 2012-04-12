@@ -5,7 +5,7 @@ const PLUGIN_INFO =
     <name>HoK</name>
     <description>Hit a hint for KeySnail (Modified for Numpaar)</description>
     <description lang="ja">キーボードでリンクを開く (Numpaar向け改造版)</description>
-    <version>1.3.1-numpaar</version>
+    <version>1.3.1-numpaar1</version>
     <updateURL>https://raw.github.com/debug-ito/keysnail/master/plugins/hok.ks.js</updateURL>
     <iconURL>https://github.com/mooz/keysnail/raw/master/plugins/icon/hok.icon.png</iconURL>
     <author mail="stillpedant@gmail.com" homepage="http://d.hatena.ne.jp/mooz/">mooz</author>
@@ -1228,6 +1228,7 @@ var hok = function () {
             }
             else
             {
+                destruction(true);
                 display.echoStatusBar(M({ja: "ヒントが見つかりませんでした", en: "No hints found"}), 1000);
                 recoverFocus();
             }
