@@ -5,7 +5,7 @@ const PLUGIN_INFO =
     <name>HoK</name>
     <description>Hit a hint for KeySnail (Modified for Numpaar)</description>
     <description lang="ja">キーボードでリンクを開く (Numpaar向け改造版)</description>
-    <version>101.3.1</version>
+    <version>101.3.3</version>
     <updateURL>https://raw.github.com/debug-ito/keysnail/master/plugins/hok.ks.js</updateURL>
     <iconURL>https://github.com/mooz/keysnail/raw/master/plugins/icon/hok.icon.png</iconURL>
     <author mail="stillpedant@gmail.com" homepage="http://d.hatena.ne.jp/mooz/">mooz</author>
@@ -419,7 +419,9 @@ const pOptions = plugins.setupOptions("hok", {
 
     "hint_base_style" : {
         preset: {
-            "position"       : 'absolute',
+            "position"       : 'fixed',
+            "top"            : '0',
+            "left"           : '0',
             "z-index"        : '2147483647',
             "color"          : '#000',
             "font-family"    : 'monospace',
@@ -821,6 +823,10 @@ var hok = function () {
         hintSpans = null;
     }
 
+    function getBodyForDocument(doc) {
+        return doc ? doc.body || (useSelector && doc.querySelector("body")) || doc.documentElement : null;
+    }
+
     function drawHints(win) {
         var isMain = false;
         if (!win) {
@@ -835,7 +841,7 @@ var hok = function () {
             return;
 
         var html = doc.documentElement;
-        var body = doc.body;
+        var body = getBodyForDocument(doc);
 
         if (!body)
         {
@@ -850,6 +856,11 @@ var hok = function () {
         var width  = win.innerWidth;
 
         var [scrollX, scrollY] = getBodyOffsets(body, html, win);
+
+        if (hintBaseStyle.position === "fixed") {
+            scrollX -= win.scrollX;
+            scrollY -= win.scrollY;
+        }
 
         // Arrange hint containers {{ =============================================== //
 
@@ -951,8 +962,18 @@ var hok = function () {
             hintColorLink : hintColorForm;
     }
 
+    function getAliveLastMatchHint() {
+        try {
+            if (lastMatchHint && lastMatchHint.style)
+                return lastMatchHint;
+        } catch (x) {
+            lastMatchHint = null;
+        }
+        return null;
+    }
+
     function blurHint() {
-        if (lastMatchHint)
+        if (getAliveLastMatchHint())
         {
             lastMatchHint.style.backgroundColor = getHintColor(lastMatchHint.element);
             lastMatchHint = null;
@@ -1010,12 +1031,13 @@ var hok = function () {
             win = window.content;
 
         var doc = win.document;
+        var body = getBodyForDocument(doc);
 
         var hintContainer = doc.getElementById(hintContainerId);
-        if (doc && doc.body && hintContainer)
+        if (body && hintContainer)
         {
             try {
-                doc.body.removeChild(hintContainer);
+                body.removeChild(hintContainer);
             } catch (x) { util.message(x); }
         }
 
@@ -1106,7 +1128,7 @@ var hok = function () {
                 updateHeaderMatchHints();
             return;
         case 'Enter':
-            if (lastMatchHint) {
+            if (getAliveLastMatchHint()) {
                 let elem = lastMatchHint.element;
                 destruction();
                 fire(elem);
@@ -1132,7 +1154,7 @@ var hok = function () {
 
         // fire if hint is unique
         if (uniqueFire && !supressUniqueFire) {
-            if (foundCount == 1 && lastMatchHint) {
+            if (foundCount == 1 && getAliveLastMatchHint()) {
                 var targetElem = lastMatchHint.element;
                 destruction();
 
