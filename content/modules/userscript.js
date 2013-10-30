@@ -6,17 +6,6 @@
  */
 
 const userscript = {
-    /**
-     * load js file and execute its content under *KeySnail.modules* scope
-     * @param {string} aScriptPath
-     */
-    jsFileLoader: function (aScriptPath, aPreserve) {
-        var code = util.readTextFile(aScriptPath);
-        if (KeySnail.isMainWindow && aPreserve)
-            this.preserveCode(code);
-        util.evalInContext(code);
-    },
-
     // ==== user configuration file name ====
     // at first .keysnail.js is used. When the file not found,
     // then the _keysnail.js is used instead. (for the Windows user)
@@ -69,8 +58,11 @@ const userscript = {
     },
 
     get disabledPlugins() {
-        return (util.getUnicharPref("extensions.keysnail.plugin.disabled_plugins")
-                || "").split(",");
+        return (util.getUnicharPref("extensions.keysnail.plugin.disabled_plugins") || "").split(",");
+    },
+
+    set disabledPlugins(plugins) {
+        util.setUnicharPref("extensions.keysnail.plugin.disabled_plugins", plugins.join(","));
     },
 
     // ==================== Loader ==================== //
@@ -86,7 +78,7 @@ const userscript = {
 
             try {
                 var start = Date.now();
-                this.jsFileLoader(aInitFilePath, true);
+                this.loadInitFileInternal(aInitFilePath, true);
                 var end = Date.now();
                 display.echoStatusBar("KeySnail :: [" + aInitFilePath + "] :: " +
                                       util.getLocaleString("initFileLoaded", [(end - start) / 1000]),
@@ -96,6 +88,17 @@ const userscript = {
                 throw e;
             }
         }, this);
+    },
+
+    /**
+     * load js file and execute its content under *KeySnail.modules* scope
+     * @param {string} aScriptPath
+     */
+    loadInitFileInternal: function (aScriptPath, aSavePreserveArea) {
+        var code = util.readTextFile(aScriptPath);
+        if (KeySnail.isMainWindow && aSavePreserveArea)
+            this.preserveCode(code);
+        util.evalInContext(code);
     },
 
     loadSubScript: function (aURI, aContext, aIgnoreCache) {
@@ -169,57 +172,7 @@ const userscript = {
             return L(msg);
         };
 
-        // Arrange plugin scope, option holder, and lib area
-        let plugins = modules.plugins = {};
-        plugins.context = {};
-        plugins.options = {};
-        plugins.lib     = {};
-        plugins.setupOptions = function (prefix, defaults, info) {
-            let options = {};
-
-            if (info && !("options" in info))
-                info.appendChild(<options></options>);
-
-            for (let [name, { preset, description, type, hidden }] in Iterator(defaults)) {
-                let fullName = prefix + "." + name;
-
-                // XXX: bind values
-                let _preset = preset;
-                let _name   = name;
-                options.__defineGetter__(name, function () {
-                    return (fullName in plugins.options) ?
-                        plugins.options[fullName] : _preset;
-                });
-
-                options.__defineSetter__(name, function (val) {
-                    plugins.options[fullName] = val;
-                });
-
-                if (info && !hidden) {
-                    info.options.appendChild(
-                            <option>
-                                <name>{fullName}</name>
-                                <type>{type || typeof preset}</type>
-                                <description>{description || ""}</description>
-                            </option>
-                    );
-                }
-            }
-
-            return options;
-        };
-
-        plugins.withProvides = function (context, info) {
-            if (info && !("provides" in info))
-                info.appendChild(<provides></provides>);
-
-            function provide(name, action, description) {
-                ext.add.apply(ext, arguments);
-                info.provides.appendChild(<ext>{name}</ext>);
-            }
-
-            context(provide);
-        };
+        // Arrange modules.plugins
 
         if (this.pluginDir)
             this.addLoadPath(this.pluginDir);
@@ -377,18 +330,27 @@ const userscript = {
         this.pluginDir = fp.file.path;
     },
 
+    pluginInfoXMLPattern: /\bPLUGIN_INFO[ \t\r\n]*=[ \t\r\n]*(<KeySnailPlugin(?:[ \t\r\n][^>]*)?>([\s\S]+?)<\/KeySnailPlugin[ \t\r\n]*>)/,
     getPluginInformation: function (aText) {
-        let m = /\bPLUGIN_INFO[ \t\r\n]*=[ \t\r\n]*(<KeySnailPlugin(?:[ \t\r\n][^>]*)?>([\s\S]+?)<\/KeySnailPlugin[ \t\r\n]*>)/.exec(aText);
-
-        return m ? new XML(m[1]) : null;
+        let matched = this.pluginInfoXMLPattern.exec(aText);
+        if (matched) {
+            var { PluginInfo } = Components.utils.import("resource://keysnail-share/plugin-info.js", {});
+            var xmlString = matched[1];
+            var pluginInfo = new PluginInfo(xmlString, util.userLocale);
+            return pluginInfo;
+        }
+        return null;
     },
 
-    getPluginInformationFromPath: function (aPath) {
-        var read = util.readTextFile(aPath);
-        if (!read)
-            return null;
-
-        return this.getPluginInformation(read);
+    normalizePluginSourceCode: function (pluginSourceCode) {
+        let normalizedSourceCode = pluginSourceCode.replace(
+            this.pluginInfoXMLPattern,
+            "__ksPlaceHolder__ = null;"
+        );
+        return {
+            removedLineCount: 0, // TODO
+            sourceCode: normalizedSourceCode
+        };
     },
 
     /**
@@ -440,43 +402,35 @@ const userscript = {
         }
     },
 
-    uninstallPlugin: function (aFile) {
-        aFile.remove(false);
-    },
-
     /**
      * Install required files for plugin specified by <b>info</b>
-     * @param {xml} info
+     * @param {PluginInfo} info
      * @param {function} next
      */
-    installRequiredFiles: function (info, next) {
+    installRequiredFiles: function (pluginInfo, next) {
         function finish(succeeded) {
             return void (typeof next === "function" ? next(succeeded) : 0);
         }
 
-        if (!info)
+        if (!pluginInfo)
             return finish(false);
 
-        if(!info.require.length())
-            return finish(true);
-
-        let scripts = util.xmlToArray(info.require.script);
+        let scripts = pluginInfo.requiredScripts;
 
         (function installNext() {
             if (!scripts.length)
                 return finish(true);
 
-            let script = scripts.pop();
-            let url = script.text();
+            let scriptURL = scripts.pop();
 
-            util.httpGet(url, false, function (req) {
+            util.httpGet(scriptURL, false, function (req) {
                 if (req.status !== 200) {
                     util.message(req.responseText);
                     return finish(false);
                 }
 
                 try {
-                    let name = util.getLeafNameFromURL(url);
+                    let name = util.getLeafNameFromURL(scriptURL);
                     let file = userscript.writeTextTmp(name, req.responseText);
                     let installed = userscript.installFile(file);
                     util.message(installed.path + " installed");
@@ -490,16 +444,16 @@ const userscript = {
     },
 
     installPluginAndRequiredFiles: function (context) {
-        let { code, name, next, info } = context;
-        if (!info)
-            info = userscript.getPluginInformation(code);
+        let { code, name, next, pluginInfo } = context;
+        if (!pluginInfo)
+            pluginInfo = userscript.getPluginInformation(code);
 
         function doNext(status, installed) {
             if (typeof next === "function")
                 next(status, installed);
         }
 
-        if (!userscript.checkCompatibility(info)) {
+        if (!userscript.checkCompatibility(pluginInfo)) {
             // Not compatible with the current keysnail
             if (!context.force) {
                 let forced = false;
@@ -507,8 +461,8 @@ const userscript = {
                 if (context.promptNotCompatible) {
                     forced = util.confirm(util.getLocaleString("installingNotCompatiblePlugin"),
                                           util.getLocaleString("installingNotCompatiblePluginPrompt", [
-                                              util.xmlGetLocaleString(info.name),
-                                              info.version,
+                                              pluginInfo.name,
+                                              pluginInfo.version,
                                               KeySnail.version
                                           ]));
                 }
@@ -526,7 +480,7 @@ const userscript = {
             return doNext(false);
         }
 
-        userscript.installRequiredFiles(info, function (succeeded) {
+        userscript.installRequiredFiles(pluginInfo, function (succeeded) {
             if (!succeeded)
                 return doNext(succeeded);
 
@@ -597,23 +551,23 @@ const userscript = {
     doesPluginHasUpdate: function (pluginPath, next) {
         // local file
         let localCode = util.readTextFile(pluginPath);
-        let localInfo = userscript.getPluginInformation(localCode);
+        let localPluginInfo = userscript.getPluginInformation(localCode);
 
-        let updateURL = util.xmlGetLocaleString(localInfo.updateURL);
+        let updateURL = localPluginInfo.updateURL;
 
         if (!updateURL)
             return void (typeof next === "function" ? next(false) : 0);
 
         util.httpGet(updateURL, false, function (req) {
             let { responseText : remoteCode } = req;
-            let remoteInfo = userscript.getPluginInformation(remoteCode);
+            let remotePluginInfo = userscript.getPluginInformation(remoteCode);
 
             let hasUpdate = false;
 
             if (req.status === 200) {
-                if (remoteInfo) {
-                    let localVersion  = util.xmlGetLocaleString(localInfo.version);
-                    let remoteVersion = util.xmlGetLocaleString(remoteInfo.version);
+                if (remotePluginInfo) {
+                    let localVersion  = localPluginInfo.version;
+                    let remoteVersion = remotePluginInfo.version;
 
                     hasUpdate = localVersion && remoteVersion &&
                         (userscript.compareVersion(localVersion, remoteVersion) < 0);
@@ -621,7 +575,7 @@ const userscript = {
             }
 
             if (typeof next === "function")
-                next(hasUpdate, { code : remoteCode, info : remoteInfo });
+                next(hasUpdate, { code : remoteCode, pluginInfo : remotePluginInfo });
         });
     },
 
@@ -642,14 +596,14 @@ const userscript = {
                 return doNext(false);
             }
 
-            let { code, info } = context;
+            let { code, pluginInfo } = context;
 
             /**
              * TODO: It's better to display the diff file of local and remote ones.
              * Are there good diff implementation on JavaScript?
              */
-            let name    = util.xmlGetLocaleString(info.name);
-            let version = util.xmlGetLocaleString(info.version);
+            let name    = pluginInfo.name;
+            let version = pluginInfo.version;
 
             let confirmed = util.confirm(
                 util.getLocaleString("updateFoundTitle"),
@@ -658,15 +612,31 @@ const userscript = {
 
             if (confirmed) {
                 userscript.installPluginAndRequiredFiles({
-                    name : util.getLeafNameFromURL(util.pathToURL(pluginPath)),
-                    code : code,
-                    info : info,
-                    next : doNext
+                    name       : util.getLeafNameFromURL(util.pathToURL(pluginPath)),
+                    code       : code,
+                    pluginInfo : pluginInfo,
+                    next       : doNext
                 });
             } else {
                 doNext(false);
             }
         });
+    },
+
+    installPluginsFromURLs: function (aURLs, onFinal) {
+        var toInstallUrls = Array.slice(aURLs);
+
+        (function installNext(installStatus) {
+            if (!toInstallUrls.length) {
+                if (typeof onFinal === "function")
+                    onFinal(installStatus);
+                return;
+            }
+
+            userscript.installPluginFromURL(toInstallUrls.shift(), function (installStatus) {
+                installNext(installStatus);
+            });
+        })(true);
     },
 
     /**
@@ -685,15 +655,15 @@ const userscript = {
         }
 
         function displayPromptAndInstall(code) {
-            let info = userscript.getPluginInformation(code);
+            let pluginInfo = userscript.getPluginInformation(code);
 
             let arg = {
-                xml       : info,
-                pluginURL : aURL,
-                type      : null
+                pluginInfo : pluginInfo,
+                pluginURL  : aURL,
+                type       : null
             };
 
-            if (!info) {
+            if (!pluginInfo) {
                 // not a valid keysnail plugin
                 display.notify(util.getLocaleString("invalidPlugin"));
                 return doNext(false);
@@ -707,10 +677,10 @@ const userscript = {
             switch (arg.type) {
             case "install":
                 userscript.installPluginAndRequiredFiles({
-                    name : util.getLeafNameFromURL(aURL),
-                    code : code,
-                    info : info,
-                    next : function (succeeded, installed) {
+                    name       : util.getLeafNameFromURL(aURL),
+                    code       : code,
+                    pluginInfo : pluginInfo,
+                    next       : function (succeeded, installed) {
                         if (succeeded) {
                             userscript.newlyInstalledPlugin = installed.path;
                             userscript.openPluginManager();
@@ -721,7 +691,7 @@ const userscript = {
                 });
                 break;
             case "viewsource":
-                gBrowser.loadOneTab(util.pathToURL(pluginFile.path), null, null, null, false);
+                gBrowser.loadOneTab(aURL, null, null, null, false);
                 doNext(false);
                 break;
             default:
@@ -737,7 +707,9 @@ const userscript = {
                 return doNext(false);
             }
         } else {
+            display.echoStatusBar("Fetching a plugin ...");
             util.httpGet(aURL, false, function (req) {
+                display.echoStatusBar("");
                 if (req.status !== 200)
                     return doNext(false);
 
@@ -746,7 +718,10 @@ const userscript = {
         }
     },
 
-    openPluginManager: function () {
+    openPluginManager: function (initiallySelectedPluginPath) {
+        if (initiallySelectedPluginPath)
+            userscript.initiallySelectedPluginPath = initiallySelectedPluginPath;
+
         var pluginManagerURL = "chrome://keysnail/content/pluginmanager.xul";
 
         var tabs = gBrowser.mTabContainer.childNodes;
@@ -769,15 +744,15 @@ const userscript = {
         return this.disabledPlugins.some(function (aDisabled) aPath === aDisabled);
     },
 
-    checkCompatibility: function (aXml) {
-        if (!aXml)
+    checkCompatibility: function (aPluginInfo) {
+        if (!aPluginInfo)
             return false;
 
-        var min = aXml.minVersion;
-        var max = aXml.maxVersion;
+        var min = aPluginInfo.minKeySnailVersion;
+        var max = aPluginInfo.maxKeySnailVersion;
 
-        if ((min.length() && this.compareVersion(KeySnail.version, min) < 0) ||
-            (max.length() && this.compareVersion(KeySnail.version, max) > 0))
+        if ((min && this.compareVersion(KeySnail.version, min) < 0) ||
+            (max && this.compareVersion(KeySnail.version, max) > 0))
         {
             return false;
         }
@@ -785,17 +760,17 @@ const userscript = {
         return true;
     },
 
-    checkDocumentURI: function (aXml) {
+    checkDocumentURI: function (aPluginInfo) {
         var documentURI = document.documentURI;
-        var includeURI  = aXml.include;
-        var excludeURI  = aXml.exclude;
+        var includeURIs  = aPluginInfo.includeDocumentURIs;
+        var excludeURIs  = aPluginInfo.excludeDocumentURIs;
 
         var entry, uri;
         var replacePair = {
             main: "chrome://browser/content/browser.xul"
         };
 
-        for (let [, entry] in Iterator(includeURI))
+        for (let [, entry] in Iterator(includeURIs))
         {
             uri = replacePair[entry] || entry;
 
@@ -803,7 +778,7 @@ const userscript = {
                 return false;
         }
 
-        for (let [, entry] in Iterator(excludeURI))
+        for (let [, entry] in Iterator(excludeURIs))
         {
             uri = replacePair[entry] || entry;
 
@@ -819,8 +794,7 @@ const userscript = {
         var context;
 
         // create context
-        plugins.context[filePath] = {__proto__ : KeySnail.modules};
-        context = plugins.context[filePath];
+        context = plugins.context[filePath] = {__proto__ : KeySnail.modules};
         context.__ksFileName__ = aFile.leafName;
 
         if (this.isDisabledPlugin(aFile.path))
@@ -829,9 +803,17 @@ const userscript = {
             return;
         }
 
-        var xml = this.getPluginInformationFromPath(aFile.path);
+        var pluginText = util.readTextFile(aFile.path);
 
-        if (!this.checkCompatibility(xml))
+        // Arrange plugin info
+        var pluginInfo = this.getPluginInformation(pluginText);
+        context.__ksPluginInfo__ = pluginInfo;
+        Object.defineProperty(context, "PLUGIN_INFO", {
+            value: pluginInfo,
+            enumerable: true
+        });
+
+        if (!this.checkCompatibility(pluginInfo))
         {
             context.__ksLoaded__        = false;
             context.__ksNotCompatible__ = true;
@@ -840,7 +822,7 @@ const userscript = {
         }
         context.__ksNotCompatible__ = false;
 
-        if (!this.checkDocumentURI(xml))
+        if (!this.checkDocumentURI(pluginInfo))
         {
             // util.message("keysnail :: plugin " + aFile.leafName + " will not be loaded on this URI ... skip");
             context.__ksLoaded__ = false;
@@ -848,12 +830,15 @@ const userscript = {
         }
 
         // add self reference
-        context.__ksSelf__   = context;
+        context.__ksSelf__ = context;
+
+        let normalizationInfo = this.normalizePluginSourceCode(pluginText);
 
         key.withExternalFileStatus(true, function () {
             try
             {
-                this.loadSubScript(filePath, context, aIgnoreCache);
+                // TODO: this breaks line numbers in errors from plugins
+                util.evalInContext(normalizationInfo.sourceCode, context);
                 context.__ksLoaded__ = true;
             }
             catch (e)
@@ -867,6 +852,50 @@ const userscript = {
                 util.message(msgstr + "\n" + e + " (in " + filePath + ")");
             }
         }, this);
+    },
+
+    enablePlugin: function (pluginFile) {
+        var toEnablePluginPath = pluginFile.path;
+
+        userscript.disabledPlugins = userscript.disabledPlugins.filter(function (disabledPluginPath) {
+            return disabledPluginPath !== toEnablePluginPath;
+        });
+
+        if (!plugins.context[toEnablePluginPath].__ksLoaded__) {
+            userscript.loadPlugin(pluginFile);
+        }
+
+        return plugins.context[toEnablePluginPath].__ksLoaded__;
+    },
+
+    disablePlugin: function (pluginFile) {
+        var toDisablePluginPath = pluginFile.path;
+
+        if (userscript.disabledPlugins.indexOf(toDisablePluginPath) < 0) {
+            userscript.disabledPlugins = userscript.disabledPlugins.concat(toDisablePluginPath);
+            // TODO: unload mechanism?
+        }
+
+        return true;
+    },
+
+    uninstallPlugin: function (pluginFile, noConfirm) {
+        var toUninstallPluginPath = pluginFile.path;
+        var pluginInfo = plugins.context[toUninstallPluginPath];
+
+        var reallyDelete = noConfirm || util.confirm(util.getLocaleString("deletePluginTitle",
+                                                                          [pluginInfo.name]),
+                                                     util.getLocaleString("deletePluginMessage",
+                                                                          [pluginInfo.name || toUninstallPluginPath]));
+        if (reallyDelete) {
+            if (pluginFile && pluginFile.exists()) {
+                pluginFile.remove(true);
+                delete plugins.context[toUninstallPluginPath];
+                return true;
+            }
+        }
+
+        return false;
     },
 
     /**

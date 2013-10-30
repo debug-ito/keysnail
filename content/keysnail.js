@@ -84,6 +84,7 @@
                                  "prompt",
                                  "ext",
                                  "shell",
+                                 "plugins",
                                  // UserScript must be the last
                                  "userscript"];
 
@@ -118,12 +119,12 @@
             prompt     = modules.prompt;
             ext        = modules.ext;
             shell      = modules.shell;
+            plugins    = modules.plugins;
             userscript = modules.userscript;
             completer  = modules.completer;
             vimp       = modules.vimp;
             L          = modules.L;
             M          = modules.M;
-            plugins    = modules.plugins;
 
             // }} ======================================================================= //
 
@@ -630,7 +631,7 @@
                 userscript.installPluginAndRequiredFiles({
                     name           : util.getLeafNameFromURL(util.pathToURL(script.path)),
                     code           : script.code,
-                    info           : script.info,
+                    pluginInfo     : script.pluginInfo,
                     forceOverWrite : true,
                     next           : function (succeeded) {
                         if (typeof next === "function")

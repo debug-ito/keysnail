@@ -128,9 +128,10 @@ const util = function () {
                     if (!matched)
                         return null;
 
-                    let xml = new XML(matched[1]);
+                    let xml = util.xmlToDom(matched[1], util.XHTML);
 
-                    return [cs.suggestion.@data for each (cs in xml.CompleteSuggestion)];
+                    return Array.slice(xml.querySelectorAll("suggestion[data]"))
+                        .map(function (suggestion) suggestion.getAttribute("data"));
                 }
             };
         },
@@ -386,6 +387,13 @@ const util = function () {
 
         get browserDocument() {
             return this.browserWindow.document;
+        },
+
+        get gBrowser() {
+            if (typeof gBrowser !== "undefined")
+                return gBrowser;
+            else
+                return util.browserWindow.gBrowser;
         },
 
         getBrowserWindows:
@@ -1033,8 +1041,18 @@ const util = function () {
 
             try
             {
-                var icon = PlacesUtils.favicons
-                    .getFaviconForPage(this.IOService.newURI(aURL, null, null));
+                var blocking = true;
+                var icon;
+                PlacesUtils.favicons
+                    .getFaviconURLForPage(this.IOService.newURI(aURL, null, null), {
+                        onComplete: function(aURI, aDataLen, aData, aMimeType) {
+                            icon = aURI;
+                            blocking = false;
+                        }
+                    });
+                var thread = Cc["@mozilla.org/thread-manager;1"].getService().mainThread;
+                while (blocking)
+                    thread.processNextEvent(true);
                 iconURL = icon.spec;
             }
             catch (x)
@@ -1412,14 +1430,17 @@ const util = function () {
          * @param {} xmlns
          * @returns {}
          */
-        xmlToDom: function (xml, xmlns, doc) {
+        xmlToDom: function (xmlString, xmlns, doc) {
             if (!xmlns)
                 xmlns = this.XUL;
+
+            if (typeof xmlString === "xml")
+                xmlString = xmlString.toXMLString();
 
             doc = doc || document;
 
             var docElem = (new DOMParser).parseFromString(
-                '<root xmlns="' + xmlns + '">' + xml.toXMLString() + "</root>", "application/xml"
+                '<root xmlns="' + xmlns + '">' + xmlString + "</root>", "application/xml"
             ).documentElement;
             var imported = document.importNode(docElem, true);
             var range = document.createRange();
@@ -1427,33 +1448,6 @@ const util = function () {
             var fragment = range.extractContents();
             range.detach();
             return fragment.childNodes.length > 1 ? fragment : fragment.firstChild;
-        },
-
-        /**
-         * Get locale specific string from given node.
-         * @param {XML} aNodes E4X type XML object
-         * @returns {string} locale specific string of the <b>aNodes</b>
-         */
-        xmlGetLocaleString: function (aNodes) {
-            if (typeof aNodes === "string")
-                return aNodes;
-
-            var length = aNodes.length();
-
-            if (length == 0)
-                return "";
-
-            for (var i = 0; i < length; ++i)
-            {
-                if (aNodes[i].@lang.toString() == this.userLocale)
-                    return aNodes[i].text();
-            }
-
-            return aNodes[0].text();
-        },
-
-        xmlToArray: function (xml) {
-            return [xml[i] for (i in this.range(0, xml.length()))];
         },
 
         // }} ======================================================================= //
@@ -1477,8 +1471,7 @@ const util = function () {
                     if (item)
                         aContainer.push(item);
                 }
-                else if (PlacesUtils.nodeIsFolder(childNode)
-                         && !PlacesUtils.nodeIsLivemarkContainer(childNode))
+                else if (PlacesUtils.nodeIsFolder(childNode))
                 {
                     arguments.callee(childNode.itemId, aFilter, aContainer);
                 }
@@ -1622,6 +1615,10 @@ const util = function () {
             separator.push(" //");
 
             return separator.join("");
+        },
+
+        getTypeName: function (object) {
+            return Object.prototype.toString.call(object);
         },
 
         /**

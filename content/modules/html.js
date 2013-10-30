@@ -6,32 +6,24 @@
  */
 
 const html = {
-    htmlTemplate: <><![CDATA[
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-        <html xmlns="http://www.w3.org/1999/xhtml">
-            <head>
-                <title>##HTMLTITLE##</title>
-                <style type="text/css">
-                    ##CSS##
-                </style>
-            </head>
-            <body>
-                <div id="container">
-                    ##CONTENTS##
-                </div>
-            </body>
-        </html>
-    ]]></>.toString(),
+    htmlTemplate: '\
+        <?xml version="1.0" encoding="UTF-8"?>\n\
+        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">\n\
+        <html xmlns="http://www.w3.org/1999/xhtml">\n\
+            <head>\n\
+                <title>##HTMLTITLE##</title>\n\
+                <style type="text/css">\n\
+                    ##CSS##\n\
+                </style>\n\
+            </head>\n\
+            <body>\n\
+                <div id="container">\n\
+                    ##CONTENTS##\n\
+                </div>\n\
+            </body>\n\
+        </html>',
 
     styleSheet: null,
-
-    replacePair : {
-        "<" : "&lt;",
-        ">" : "&gt;",
-        "'" : "&apos;",
-        "\"": "&quot;"
-    },
 
     init: function () {
     },
@@ -80,25 +72,11 @@ const html = {
     },
 
     escapeTag: function (aString) {
-        if (!aString)
-            return "";
-
-        for (let [bad, good] in Iterator(this.replacePair))
-            while (aString.indexOf(bad) !== -1)
-                aString = aString.replace(bad, good);
-
-        return aString;
+        return _.escape(aString);
     },
 
     unEscapeTag: function (aString) {
-        if (!aString)
-            return "";
-
-        for (let [bad, good] in Iterator(this.replacePair))
-            while (aString.indexOf(good) !== -1)
-                aString = aString.replace(good, bad);
-
-        return aString;
+        return _.unescape(aString);
     },
 
     // original code from prototype.js

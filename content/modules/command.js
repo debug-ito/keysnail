@@ -95,20 +95,18 @@ const command = {
      * @return
      */
     elementsRetrieverTextarea: function (aDocument) {
-        let xPathExp = <><![CDATA[
-            //input[(@type="text" or @type="password" or @type="search" or not(@type)) and not(@type="hidden")]
-          | //textarea
-          | //textbox
-        ]]></>.toString();
+        let xPathExp = '\
+            //input[(@type="text" or @type="password" or @type="search" or not(@type)) and not(@type="hidden")]\
+          | //textarea\
+          | //textbox';
 
         return util.getNodesFromXPath(xPathExp, aDocument);
     },
 
     elementsRetrieverButton: function (aDocument) {
-        let xPathExp = <><![CDATA[
-            //input[@type="submit" or @type="reset" or @type="button" or @type="image"]
-          | //button
-        ]]></>.toString();
+        let xPathExp = '\
+            //input[@type="submit" or @type="reset" or @type="button" or @type="image"]\
+          | //button';
 
         return util.getNodesFromXPath(xPathExp, aDocument);
     },
@@ -1156,8 +1154,13 @@ const command = {
         {
             aProcess.call(this, input, subword, selected, current);
             // recover scroll position
-
-            this.inputScrollSelectionIntoView(input);
+            if (aInput.nodeName === "html:input" && !oldScrollLeft && !oldScrollTop)
+                this.inputScrollSelectionIntoView(input);
+            else
+            {
+                input.scrollLeft = oldScrollLeft;
+                input.scrollTop  = oldScrollTop;
+            }
         }
     },
 

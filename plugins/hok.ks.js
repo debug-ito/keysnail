@@ -1,11 +1,11 @@
 // Plugin info {{ =========================================================== //
 
-const PLUGIN_INFO =
+var PLUGIN_INFO =
 <KeySnailPlugin>
     <name>HoK</name>
     <description>Hit a hint for KeySnail (Modified for Numpaar)</description>
     <description lang="ja">キーボードでリンクを開く (Numpaar向け改造版)</description>
-    <version>101.3.3</version>
+    <version>101.4.2</version>
     <updateURL>https://raw.github.com/debug-ito/keysnail/master/plugins/hok.ks.js</updateURL>
     <iconURL>https://github.com/mooz/keysnail/raw/master/plugins/icon/hok.icon.png</iconURL>
     <author mail="stillpedant@gmail.com" homepage="http://d.hatena.ne.jp/mooz/">mooz</author>
@@ -40,6 +40,10 @@ key.setViewKey(['C-c', 'C-e'], function (aEvent, aArg) {
 key.setViewKey(['C-c', 'C-f'], function (aEvent, aArg) {
     ext.exec("hok-start-focus-frame-mode", aArg);
 }, 'HoK - focus on a frame', true);
+
+key.setViewKey('c', function (aEvent, aArg) {
+    ext.exec("hok-yank-foreground-mode", aArg);
+}, 'Hok - Foreground yank hint mode', true);
 
 ||<
 
@@ -343,18 +347,9 @@ const pOptions = plugins.setupOptions("hok", {
         type: "array"
     },
 
-    "use_selector" : {
-        preset: true,
-        description: M({
-            en: "Use Selectors API instead of XPath. Performance up but only works after Firefox 3.1 (default: true)",
-            ja: "ヒントの取得に Selectors API を用いるかどうか。 XPath より高速となるが Firefox 3.1 以降専用。 (デフォルト: true)"
-        }),
-        type: "boolean"
-    },
-
     "selector" : {
         preset: 'a[href], input:not([type="hidden"]), textarea, iframe, area, select, button, embed,' +
-            '*[onclick], *[onmouseover], *[onmousedown], *[onmouseup], *[oncommand], *[role="link"], *[role="button"]',
+            '*[onclick], *[onmouseover], *[onmousedown], *[onmouseup], *[oncommand], *[role="link"], *[role="button"], *[role="menuitem"], *[role="tab"], *[role="checkbox"]',
         description: M({
             en: "Selectors API Path query",
             ja: "ヒントの取得に使う Selectors API クエリ"
@@ -362,21 +357,11 @@ const pOptions = plugins.setupOptions("hok", {
         type: "string"
     },
 
-    "xpath" : {
-        preset: '//input[not(@type="hidden")] | //a | //area | //iframe | //textarea | //button | //select' +
-            ' | //*[@onclick or @onmouseover or @onmousedown or @onmouseup or @oncommand or @role="link"]',
-        description: M({
-            en: "XPath query",
-            ja: "ヒントの取得に使う XPath クエリ"
-        }),
-        type: "string"
-    },
-
     "local_queries" : {
         preset: null,
         description: M({
-            en: "Site local queries (Only effective when Selectors API is used)",
-            ja: "サイト毎のクエリ (Selectors API 使用時のみ有効)"
+            en: "Site local queries",
+            ja: "サイト毎のクエリ"
         }),
         type: "array"
     },
@@ -417,6 +402,15 @@ const pOptions = plugins.setupOptions("hok", {
         type: "string"
     },
 
+    "hide_unmatched_hint" : {
+        preset: true,
+        description: M({
+            en: "Hide unmatched hints or not",
+            ja: "マッチしないヒントを隠すかどうか"
+        }),
+        type: "boolean"
+    },
+
     "hint_base_style" : {
         preset: {
             "position"       : 'fixed',
@@ -454,6 +448,26 @@ const pOptions = plugins.setupOptions("hok", {
             en: "Make unique hints only (Free from Enter key)",
             ja: "必ずユニークなヒントを生成する (Enter を押す必要が無くなる)"
         })
+    },
+
+    "follow_link_nextpattern": {
+        preset: "\\bnext\\b|\\bnewer\\b|\\bmore\\b|→$|>>$|≫$|»$|^>$|^次|進む|^つぎへ|続"
+    },
+
+    "follow_link_prevpattern": {
+        preset: "\\bback\\b|\\bprev\\b|\\bprevious\\b|\\bolder|^←|^<<|^≪|^«|^<$|戻る|^もどる|^前.*|^<前"
+    },
+
+    "follow_link_nextrel_selector": {
+        preset: "a[rel='next']"
+    },
+
+    "follow_link_prevrel_selctor": {
+        preset: "a[rel='prev']"
+    },
+
+    "follow_link_candidate_selector": {
+        preset: "a[href], input:not([type='hidden']), button"
     }
 }, PLUGIN_INFO);
 
@@ -558,6 +572,27 @@ function followLink(elem, where) {
     catch (x) {}
 }
 
+// Follow previous / next
+function followRel(doc, rel, pattern) {
+    let target  = doc.querySelector(rel);
+    if (target) {
+        followLink(target, CURRENT_TAB);
+        return;
+    }
+
+    let relLinkPattern   = new RegExp(pattern, "i");
+    let relLinkCandidates = Array.slice(
+        doc.querySelectorAll(pOptions["follow_link_candidate_selector"])
+    );
+
+    for (let [, elem] in Iterator(relLinkCandidates.reverse())) {
+        if (relLinkPattern.test(elem.textContent) /*|| regex.test(elem.value) */) {
+            followLink(elem, CURRENT_TAB);
+            return;
+        }
+    }
+}
+
 function openContextMenu(elem) {
     document.popupNode = elem;
     var menu = document.getElementById("contentAreaContextMenu");
@@ -585,7 +620,7 @@ function saveLink(elem, skipPrompt) {
 
     try {
         window.urlSecurityCheck(url, doc.nodePrincipal);
-        saveURL(url, text, null, true, skipPrompt, makeURI(url, doc.characterSet));
+        saveURL(url, text, null, true, skipPrompt, makeURI(url, doc.characterSet), doc);
     } catch (e) {}
 }
 
@@ -608,6 +643,11 @@ function viewSource(url, useExternalEditor) {
     }
 }
 
+// Yank the href of an element
+function yank(elem) {
+    command.setClipboardText(elem.href);
+}
+
 function recoverFocus() {
     gBrowser.focus();
     _content.focus();
@@ -618,20 +658,15 @@ function recoverFocus() {
 // HoK object {{ ============================================================ //
 
 var originalSuspendedStatus;
-var useSelector = pOptions["use_selector"] && ("querySelector" in document);
 
 var hok = function () {
     var hintKeys            = pOptions["hint_keys"];
-    var selector            = pOptions["selector"];
-    var xPathExp            = pOptions["xpath"];
     var hintBaseStyle       = pOptions["hint_base_style"];
     var hintColorLink       = pOptions["hint_color_link"];
     var hintColorForm       = pOptions["hint_color_form"];
     var hintColorFocused    = pOptions["hint_color_focused"];
     var hintColorCandidates = pOptions["hint_color_candidates"];
     var elementColorFocused = pOptions["element_color_focused"];
-    var uniqueOnly          = pOptions["unique_only"];
-    var uniqueFire          = pOptions["unique_fire"];
 
     var keyMap = {};
     if (pOptions["user_keymap"])
@@ -689,6 +724,7 @@ var hok = function () {
     function createTextHints(amount) {
         var reverseHints = {};
         var numHints = 0;
+        var uniqueOnly = pOptions["unique_only"];
 
         function next(hint) {
             var l = hint.length;
@@ -824,7 +860,7 @@ var hok = function () {
     }
 
     function getBodyForDocument(doc) {
-        return doc ? doc.body || (useSelector && doc.querySelector("body")) || doc.documentElement : null;
+        return doc ? doc.body || doc.querySelector("body") || doc.documentElement : null;
     }
 
     function drawHints(win) {
@@ -887,18 +923,7 @@ var hok = function () {
 
         var result, elem;
 
-        if (useSelector)
-        {
-            result = doc.querySelectorAll(priorQuery || localQuery || selector);
-        }
-        else
-        {
-            let xpathResult = doc.evaluate(priorQuery || xPathExp, doc, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-            result = [];
-
-            for (let i = 0, len = xpathResult.snapshotLength; i < len; ++i)
-                result.push(xpathResult.snapshotItem(i));
-        }
+        result = doc.querySelectorAll(priorQuery || localQuery || pOptions["selector"]);
 
         var style, rect, hint, span, top, left, ss;
         var leftpos, toppos;
@@ -1006,6 +1031,7 @@ var hok = function () {
     }
 
     function updateHeaderMatchHints() {
+        const hideUnmatchedHint = pOptions["hide_unmatched_hint"];
         let foundCount = 0;
 
         for (let [hintStr, hintElem] in Iterator(hintElements)) {
@@ -1014,6 +1040,8 @@ var hok = function () {
                     hintElem.style.backgroundColor = hintColorCandidates;
                 foundCount++;
             } else {
+                if (hideUnmatchedHint)
+                    hintElem.style.display = "none";
                 hintElem.style.backgroundColor = getHintColor(hintElem.element);
             }
         }
@@ -1022,8 +1050,10 @@ var hok = function () {
     }
 
     function resetHintsColor() {
-        for (let [, span] in Iterator(hintElements))
+        for (let [, span] in Iterator(hintElements)) {
             span.style.backgroundColor = getHintColor(span.element);
+            span.style.display = "inline";
+        }
     }
 
     function removeHints(win) {
@@ -1066,9 +1096,9 @@ var hok = function () {
                 util.message(x);
             }
 
+            document.removeEventListener('keydown', stopEventPropagation, true);
             document.removeEventListener('keypress', onKeyPress, true);
-            document.removeEventListener('keydown', preventEvent, true);
-            document.removeEventListener('keyup', preventEvent, true);
+            document.removeEventListener('keyup', stopEventPropagation, true);
         }
 
         display.echoStatusBar("");
@@ -1094,14 +1124,13 @@ var hok = function () {
     function onKeyPress(event) {
         var keyStr = key.keyEventToString(event);
 
+        preventEvent(event);
+
         if (!keyMap.hasOwnProperty(keyStr))
         {
             destruction(true);
             return;
         }
-
-        event.preventDefault();
-        event.stopPropagation();
 
         var role = keyMap[keyStr];
 
@@ -1153,7 +1182,7 @@ var hok = function () {
         let foundCount = updateHeaderMatchHints();
 
         // fire if hint is unique
-        if (uniqueFire && !supressUniqueFire) {
+        if (pOptions["unique_fire"] && !supressUniqueFire) {
             if (foundCount == 1 && getAliveLastMatchHint()) {
                 var targetElem = lastMatchHint.element;
                 destruction();
@@ -1163,29 +1192,26 @@ var hok = function () {
         }
     }
 
+    function stopEventPropagation(event) {
+        event.stopPropagation();
+    }
+
     function preventEvent(event) {
         event.preventDefault();
         event.stopPropagation();
     }
 
     function setLocalQuery() {
-        if (pOptions["local_queries"] && typeof content.location.href == "string")
+        let currentPageURL = content.location.href;
+        if (pOptions["local_queries"] && currentPageURL)
         {
-            for (let [, row] in Iterator(pOptions["local_queries"]))
+            for (let [, [targetURLPattern, localSelector, toOverride]]
+                 in Iterator(pOptions["local_queries"]))
             {
-                if (content.location.href.match(row[0]))
+                if (currentPageURL.match(targetURLPattern))
                 {
-                    if (row[2])
-                    {
-                        // not append
-                        localQuery = row[1];
-                    }
-                    else
-                    {
-                        // append
-                        localQuery = selector + ", " + row[1];
-                    }
-
+                    localQuery = toOverride ? localSelector
+                        : pOptions["selector"] + ", " + localSelector;
                     return;
                 }
             }
@@ -1237,16 +1263,19 @@ var hok = function () {
             originalSuspendedStatus = key.suspended;
             key.suspended = true;
 
-            init();
-            setLocalQuery();
-
-            drawHints();
+            try {
+                init();
+                setLocalQuery();
+                drawHints();
+            } catch (x) {
+                hintCount = 0;
+            }
 
             if (hintCount >= 1)
             {
+                document.addEventListener('keydown', stopEventPropagation, true);
                 document.addEventListener('keypress', onKeyPress, true);
-                document.addEventListener('keydown', preventEvent, true);
-                document.addEventListener('keyup', preventEvent, true);
+                document.addEventListener('keyup', stopEventPropagation, true);
             }
             else
             {
@@ -1260,6 +1289,13 @@ var hok = function () {
             var result = createCommonContext(arg);
             uniqueOnly = result.unique_only;
             self.start(function (elem) followLink(elem, CURRENT_TAB), result.context);
+        },
+
+        yankForeground: function (supressUniqueFire) {
+            self.start(yank,
+                      {
+                          supressUniqueFire: supressUniqueFire
+                      });
         },
 
         startBackground: function (arg) {
@@ -1299,8 +1335,8 @@ function formatActions(aActions) {
 }
 
 var query = {
-    images : useSelector ? "img" : "//img",
-    frames : useSelector ? "body" : "//body"
+    images : "img",
+    frames : "body"
 };
 
 // ['Key', 'Description', function (elem) { /* process hint elem */ }, supressUniqueFire, continuousMode, 'Query query']
@@ -1316,7 +1352,7 @@ var actions = [
     ['F', M({ja: "連続してリンクを開く", en: "Open multiple hints in tabs"}), function (elem) plugins.hok.followLink(elem, NEW_BACKGROUND_TAB), false, true],
     ['v', M({ja: "リンク先のソースコードを表示", en: "View hint source"}), function (elem) plugins.hok.viewSource(elem.href, false)],
     ['V', M({ja: "リンク先のソースコードを外部エディタで表示", en: "View hint source in external editor"}), function (elem) plugins.hok.viewSource(elem.href, true)],
-    ['y', M({ja: "リンクの URL をコピー", en: "Yank hint location"}), function (elem) command.setClipboardText(elem.href)],
+    ['y', M({ja: "リンクの URL をコピー", en: "Yank hint location"}), yank],
     ['Y', M({ja: "要素の内容をコピー", en: "Yank hint description"}), function (elem) command.setClipboardText(elem.textContent || "")],
     ['c', M({ja: "右クリックメニューを開く", en: "Open context menu"}), function (elem) plugins.hok.openContextMenu(elem)],
     ['i', M({ja: "画像を開く", en: "Show image"}), function (elem) plugins.hok.openURI(elem.src), false, false, query.images],
@@ -1354,6 +1390,10 @@ plugins.withProvides(function (provide) {
             function (ev, arg) hok.startForeground(!(arg === null)),
             M({ja: "HoK - リンクをフォアグラウンドで開く", en: "Start Hit a Hint foreground mode"}));
 
+    provide("hok-yank-foreground-mode",
+            function (ev, arg) hok.yankForeground(!(arg === null)),
+            M({ja: "HoK - リンクの URL をコピー", en: "Start Hit a Yank foreground mode"}));
+
     provide("hok-start-background-mode",
             function (ev, arg) hok.startBackground(!(arg === null)),
             M({ja: "HoK - リンクをバックグラウンドで開く", en: "Start Hit a Hint background mode"}));
@@ -1390,7 +1430,18 @@ plugins.withProvides(function (provide) {
     provide("hok-start-focus-frame-mode",
             function (ev, arg) hok.startFocusFrame(!(arg == null)),
             M({ja: "HoK - フレームへフォーカス", en: "Start Hit a Hint to focus on a frame"}));
-    
+
+    provide("hok-follow-next-link", function () {
+        followRel(content.document,
+                  pOptions["follow_link_nextrel_selector"],
+                  pOptions["follow_link_nextpattern"]);
+    }, "Follow next link");
+
+    provide("hok-follow-prev-link", function () {
+        followRel(content.document,
+                  pOptions["follow_link_prevrel_selector"],
+                  pOptions["follow_link_prevpattern"]);
+    }, "Follow previous link");
 }, PLUGIN_INFO);
 
 // }} ======================================================================= //

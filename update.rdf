@@ -2,22 +2,22 @@
 <RDF:RDF xmlns:em="http://www.mozilla.org/2004/em-rdf#"
          xmlns:NC="http://home.netscape.com/NC-rdf#"
          xmlns:RDF="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-  <RDF:Seq RDF:about="rdf:#$mtJrB">
-    <RDF:li RDF:resource="rdf:#$ntJrB"/>
-  </RDF:Seq>
+  <RDF:Description RDF:about="urn:mozilla:extension:keysnail@mooz.github.com"
+                   em:signature="MIGTMA0GCSqGSIb3DQEBDQUAA4GBAJtrLNolYnYLskRW4w8feYkH7JO7eUSlpBWKkOcBqRC/EUacyJrSsHjtmLlq+SFCiDj30wBe/3eTpE6GMfG5bEQJ6bX53z45IFqjkZpA+7zO6w0dngKpt2+xHBqnKNtLz+MJ2HvqRl6+gtkqjRjenfCBU9TJgANbUEgeiQ1NCY4U">
+    <em:updates RDF:resource="rdf:#$mtJrB"/>
+  </RDF:Description>
   <RDF:Description RDF:about="rdf:#$qtJrB"
                    em:id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}"
                    em:minVersion="3.5"
-                   em:maxVersion="10.*"
+                   em:maxVersion="22.*"
                    em:updateLink="https://github.com/mooz/keysnail/raw/master/keysnail.xpi"
-                   em:updateInfoURL="http://bitbucket.org/mooz/lab/raw/tip/updateinfo/1.9.5.xhtml"
-                   em:updateHash="sha1:f7749a348cff939d1075174e83ab009a421155e6" />
-  <RDF:Description RDF:about="urn:mozilla:extension:keysnail@mooz.github.com"
-                   em:signature="MIGTMA0GCSqGSIb3DQEBDQUAA4GBAMVviZC8egwok10zawQgz46gR8O506zGVIo+vTSZiWUj//IiNRHu8M5eK7R9cYaEG7L/kq49c7TXZQI1iKOxBzU+WvRWVFyQw9/Gz6/PInOWM5oCpx/EnNkFrF7h/sAxAQ9bhL4ajhhFeaXCkxfhzYDs/NVqVrZpMYKNDMY3d2RT">
-    <em:updates RDF:resource="rdf:#$mtJrB"/>
-  </RDF:Description>
+                   em:updateInfoURL="http://bitbucket.org/mooz/lab/raw/tip/updateinfo/2.0.1.xhtml"
+                   em:updateHash="sha1:7f0d9f647abc969ee29cb85c90d07eb1458c604d" />
   <RDF:Description RDF:about="rdf:#$ntJrB"
-                   em:version="1.9.5">
+                   em:version="2.0.1">
     <em:targetApplication RDF:resource="rdf:#$qtJrB"/>
   </RDF:Description>
+  <RDF:Seq RDF:about="rdf:#$mtJrB">
+    <RDF:li RDF:resource="rdf:#$ntJrB"/>
+  </RDF:Seq>
 </RDF:RDF>
