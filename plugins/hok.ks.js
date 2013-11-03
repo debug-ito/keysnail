@@ -5,7 +5,7 @@ var PLUGIN_INFO =
     <name>HoK</name>
     <description>Hit a hint for KeySnail (Modified for Numpaar)</description>
     <description lang="ja">キーボードでリンクを開く (Numpaar向け改造版)</description>
-    <version>101.4.2</version>
+    <version>101.4.3</version>
     <updateURL>https://raw.github.com/debug-ito/keysnail/master/plugins/hok.ks.js</updateURL>
     <iconURL>https://github.com/mooz/keysnail/raw/master/plugins/icon/hok.icon.png</iconURL>
     <author mail="stillpedant@gmail.com" homepage="http://d.hatena.ne.jp/mooz/">mooz</author>
@@ -1231,16 +1231,20 @@ var hok = function () {
             });
     }
 
-    function createCommonContext (is_numpaar_mode){
-        var result = {"context" : null, "unique_only" : null};
+    function withContext (is_numpaar_mode, code) {
+        var context = (is_numpaar_mode) ? {supressUniqueFire: true, alternateHintKeys: pOptions['numpaar_keys']}
+                                        : {supressUniqueFire: false};
+        var old_unique_only = pOptions["unique_only"];
         if(is_numpaar_mode) {
-            result.context = {supressUniqueFire: true, alternateHintKeys: pOptions['numpaar_keys']};
-            result.unique_only = false;
-        }else {
-            result.context = {supressUniqueFire: false};
-            result.unique_only = pOptions["unique_only"];
+            pOptions["unique_only"] = false;
         }
-        return result;
+        try {
+            code(context);
+        }catch(e) {
+            throw e;
+        }finally {
+            pOptions["unique_only"] = old_unique_only;
+        }
     }
 
     var self = {
@@ -1286,9 +1290,9 @@ var hok = function () {
         },
 
         startForeground: function (arg) {
-            var result = createCommonContext(arg);
-            uniqueOnly = result.unique_only;
-            self.start(function (elem) followLink(elem, CURRENT_TAB), result.context);
+            withContext(arg, function(context) {
+                self.start(function (elem) followLink(elem, CURRENT_TAB), context);
+            });
         },
 
         yankForeground: function (supressUniqueFire) {
@@ -1299,9 +1303,9 @@ var hok = function () {
         },
 
         startBackground: function (arg) {
-            var result = createCommonContext(arg);
-            uniqueOnly = result.unique_only;
-            hok.start(function (elem) followLink(elem, NEW_BACKGROUND_TAB), result.context);
+            withContext(arg, function(context) {
+                self.start(function (elem) followLink(elem, NEW_BACKGROUND_TAB), context);
+            });
         },
 
         startContinuous: function () {
@@ -1313,10 +1317,9 @@ var hok = function () {
         },
 
         startFocusFrame: function (arg) {
-            var result = createCommonContext(arg);
-            uniqueOnly = result.unique_only;
-            result.context.query = query.frames;
-            hok.start(function (elem) elem.ownerDocument.defaultView.focus(), result.context);
+            withContext(arg, function(context) {
+                self.start(function (elem) elem.ownerDocument.defaultView.focus(), context);
+            });
         }
     };
 
