@@ -5,7 +5,7 @@ var PLUGIN_INFO =
     <name>HoK</name>
     <description>Hit a hint for KeySnail (Modified for Numpaar)</description>
     <description lang="ja">キーボードでリンクを開く (Numpaar向け改造版)</description>
-    <version>101.4.3</version>
+    <version>101.4.4</version>
     <updateURL>https://raw.github.com/debug-ito/keysnail/master/plugins/hok.ks.js</updateURL>
     <iconURL>https://github.com/mooz/keysnail/raw/master/plugins/icon/hok.icon.png</iconURL>
     <author mail="stillpedant@gmail.com" homepage="http://d.hatena.ne.jp/mooz/">mooz</author>
@@ -913,11 +913,10 @@ var hok = function () {
 
         var hintSpan = doc.createElement('span');
 
-        let (st = hintSpan.style) {
-            for (let [prop, value] in Iterator(hintBaseStyle))
-                st[formatPropertyName(prop)] = value;
-            st.backgroundColor = hintColorLink;
-        };
+        let st = hintSpan.style;
+        for (let [prop, value] in Iterator(hintBaseStyle))
+            st[formatPropertyName(prop)] = value;
+        st.backgroundColor = hintColorLink;
 
         // }} ======================================================================= //
 
