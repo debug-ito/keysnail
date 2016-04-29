@@ -585,7 +585,7 @@ function followRel(doc, rel, pattern) {
         doc.querySelectorAll(pOptions["follow_link_candidate_selector"])
     );
 
-    for (let [, elem] in Iterator(relLinkCandidates.reverse())) {
+    for (let elem of relLinkCandidates.reverse()) {
         if (relLinkPattern.test(elem.textContent) /*|| regex.test(elem.value) */) {
             followLink(elem, CURRENT_TAB);
             return;
@@ -753,7 +753,7 @@ var hok = function () {
         }
 
         var hints = [];
-        for (let [hint] in Iterator(reverseHints)) {
+        for (let hint of Object.keys(reverseHints)) {
             hints.push(hint);
         }
 
@@ -914,7 +914,7 @@ var hok = function () {
         var hintSpan = doc.createElement('span');
 
         let st = hintSpan.style;
-        for (let [prop, value] in Iterator(hintBaseStyle))
+        for (let [prop, value] of util.keyValues(hintBaseStyle))
             st[formatPropertyName(prop)] = value;
         st.backgroundColor = hintColorLink;
 
@@ -1033,7 +1033,7 @@ var hok = function () {
         const hideUnmatchedHint = pOptions["hide_unmatched_hint"];
         let foundCount = 0;
 
-        for (let [hintStr, hintElem] in Iterator(hintElements)) {
+        for (let [hintStr, hintElem] of util.keyValues(hintElements)) {
             if (hintStr.indexOf(inputKey) === 0) {
                 if (hintStr != inputKey)
                     hintElem.style.backgroundColor = hintColorCandidates;
@@ -1049,7 +1049,7 @@ var hok = function () {
     }
 
     function resetHintsColor() {
-        for (let [, span] in Iterator(hintElements)) {
+        for (let span of util.values(hintElements)) {
             span.style.backgroundColor = getHintColor(span.element);
             span.style.display = "inline";
         }
@@ -1204,8 +1204,8 @@ var hok = function () {
         let currentPageURL = content.location.href;
         if (pOptions["local_queries"] && currentPageURL)
         {
-            for (let [, [targetURLPattern, localSelector, toOverride]]
-                 in Iterator(pOptions["local_queries"]))
+            for (let [targetURLPattern, localSelector, toOverride]
+                 of pOptions["local_queries"])
             {
                 if (currentPageURL.match(targetURLPattern))
                 {
