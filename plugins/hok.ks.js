@@ -501,7 +501,23 @@ function createMouseEvent(aDocument, aType, aOptions) {
         defaults[prop] = aOptions[prop];
     }
 
-    event.initMouseEvent.apply(event, [for (v of defaults) v]);
+    event.initMouseEvent(
+        defaults.type,
+        defaults.bubbles,
+        defaults.cancelable,
+        defaults.view,
+        defaults.detail,
+        defaults.screenX,
+        defaults.screenY,
+        defaults.clientX,
+        defaults.clientY,
+        defaults.ctrlKey,
+        defaults.altKey,
+        defaults.shiftKey,
+        defaults.metaKey,
+        defaults.button,
+        defaults.relatedTarget
+    );
 
     return event;
 }
